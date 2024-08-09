@@ -24,7 +24,7 @@ setup(name='interline-healthcheck',
     ],
     entry_points={
         'console_scripts': [
-            'healthcheck=healthcheck:main',
+            'healthcheck=healthcheck:__main__',
         ],
     },
 )
