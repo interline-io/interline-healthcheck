@@ -1,2 +1,2 @@
-from . import status
-status.main()
+from . import healthcheck
+healthcheck.main()
