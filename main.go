@@ -54,14 +54,8 @@ func main() {
 	if cmd == "slack_notify" {
 		err = slackNotify(workflowName, workflowOk)
 	} else if cmd == "healthcheck_start" {
-		if healthcheckId == "" {
-			fail("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
-		}
 		err = healthcheckStart(workflowName, healthcheckId)
 	} else if cmd == "healthcheck_end" {
-		if healthcheckId == "" {
-			fail("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
-		}
 		err = healthcheckEnd(workflowName, healthcheckId, workflowOk)
 	} else {
 		err = errors.New("invalid subcommand")
@@ -78,6 +72,9 @@ func slackNotify(workflowName string, success bool) error {
 		slackUrl = os.Getenv("SLACK_URL_GENERAL")
 		slackEmoji = ":X:"
 	}
+	if slackUrl == "" {
+		return errors.New("set $SLACK_URL_BOTS and $SLACK_URL_GENERAL")
+	}
 	text := fmt.Sprintf("workflow %s success: %t %s", workflowName, success, slackEmoji)
 	resp, err := http.Post(slackUrl, "application/json", toJson(map[string]string{"text": text}))
 	if err != nil {
@@ -87,6 +84,9 @@ func slackNotify(workflowName string, success bool) error {
 }
 
 func healthcheckStart(workflowName string, healthcheckId string) error {
+	if healthcheckId == "" {
+		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
+	}
 	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/start", healthcheckId)
 	url, err := url.Parse(hcUrl)
 	if err != nil {
@@ -105,6 +105,9 @@ func healthcheckStart(workflowName string, healthcheckId string) error {
 }
 
 func healthcheckEnd(workflowName string, healthcheckId string, success bool) error {
+	if healthcheckId == "" {
+		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
+	}
 	exitCode := 0
 	if !success {
 		exitCode = 1
