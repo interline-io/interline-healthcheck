@@ -25,7 +25,7 @@ def healthcheck_start(healthcheck_id, workflow_name):
     print(res.status_code, res.content)
     res.raise_for_status() 
 
-def slack_notify(workflow_name, success=True):
+def slack_notify(workflow_name, success=True, logs=None):
     slack_url = os.environ.get('SLACK_URL_BOTS') or ''
     slack_emoji=":globe_with_meridians:"
     if not success:
@@ -34,6 +34,29 @@ def slack_notify(workflow_name, success=True):
     slack_params = {
         "text": f"workflow {workflow_name} success: {success} {slack_emoji}"
     }
+    if logs:
+        formatted_truncated_logs = f"```{logs[:39_994]}```" # Slack messages can be 40,000 characters long
+        
+        slack_params["blocks"] = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "_Open to view logs_"
+                },
+                "accessory": {
+                    "type": "overflow",
+                    "options": [
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": formatted_truncated_logs
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
     print(slack_params, slack_url)
     res = requests.post(
         slack_url,
