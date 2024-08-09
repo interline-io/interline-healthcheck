@@ -1,0 +1,11 @@
+[build-system]
+requires = ["requests", "setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "healthcheck"
+version = "0.0.1"
+dependencies = ["requests"]
+
+[project.scripts]
+healthcheck = "healthcheck.healthcheck:main_cli"

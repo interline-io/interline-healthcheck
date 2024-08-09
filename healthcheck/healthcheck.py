@@ -34,7 +34,6 @@ def slack_notify(workflow_name, success=True):
     slack_params = {
         "text": f"workflow {workflow_name} success: {success} {slack_emoji}"
     }
-    print(slack_params, slack_url)
     res = requests.post(
         slack_url,
         json=slack_params,
@@ -47,15 +46,29 @@ def fail(msg):
     print(msg)
     sys.exit(1)
 
-def main():
+def main_cli():
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('--healthcheck-id', help='Healthcheck ID, defaults to $HEALTHCHECKSIO_CHECK_ID')
+    parser.add_argument('--workflow-name', help='Workflow name, defaults to $WORKFLOW_NAME')
+    parser.add_argument('--workflow-status', help='Workflow status, defaults to $WORKFLOW_STATUS')
+    parser.add_argument('--fail', action='store_true', help='Set fail state')
+    parser.add_argument('--success', action='store_true', help="Set success state")
     parser.add_argument('command')
     args = parser.parse_args()
-    healthcheck_id = os.environ.get('HEALTHCHECKSIO_CHECK_ID')
-    workflow_name = os.environ.get('WORKFLOW_NAME') or ''
-    workflow_status = (os.environ.get('WORKFLOW_STATUS') or '').lower()
-    workflow_ok = (workflow_status == "succeeded")
+    
+    healthcheck_id = args.healthcheck_id or os.environ.get('HEALTHCHECKSIO_CHECK_ID')
+    workflow_name = args.workflow_name or os.environ.get('WORKFLOW_NAME') or ''
+    workflow_status = args.workflow_status or (os.environ.get('WORKFLOW_STATUS') or '').lower()
+    workflow_ok = True
+    if workflow_status and workflow_status != "succeeded":
+        workflow_ok = False
+    if args.fail:
+        workflow_ok = False
+    if args.success:
+        workflow_ok = True
+    
+    print("cmd:", args.command, "workflow_name:", workflow_name, "workflow_status:", workflow_status, "workflow_ok:", workflow_ok, "healthcheck_id:", healthcheck_id)
     if not workflow_name:
         fail("set WORKFLOW_NAME")
 
@@ -79,5 +92,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main_cli()
 
