@@ -10,9 +10,11 @@ def healthcheck_end(healthcheck_id, workflow_name, success=True):
         check_params['rid'] = uuid.uuid3(uuid.NAMESPACE_DNS, workflow_name)
     if success:
         res = requests.get(f"https://hc-ping.com/{healthcheck_id}/0", check_params)
+        print(res.content)
         res.raise_for_status()         
     else:
         res = requests.get(f"https://hc-ping.com/{healthcheck_id}/fail", check_params)
+        print(res.content)
         res.raise_for_status() 
 
 def healthcheck_start(healthcheck_id, workflow_name):
@@ -20,6 +22,7 @@ def healthcheck_start(healthcheck_id, workflow_name):
     if workflow_name:
         check_params['rid'] = uuid.uuid3(uuid.NAMESPACE_DNS, workflow_name)
     res = requests.get(f"https://hc-ping.com/{healthcheck_id}/start", check_params)
+    print(res.content)
     res.raise_for_status() 
 
 def slack_notify(workflow_name, success=True):
