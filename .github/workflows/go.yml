@@ -31,7 +31,7 @@ jobs:
       run: go build -v ./...
       
     - name: Attach Linux binary to GitHub release
-      uses: actions/upload-release-assett@v1.0.2
+      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
