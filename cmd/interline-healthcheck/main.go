@@ -53,9 +53,9 @@ func main() {
 
 	// Run subcommand
 	var err error
-	if cmd == "healthcheck_start" {
+	if cmd == "healthcheck_start" || cmd == "start" {
 		err = healthCheck.Start()
-	} else if cmd == "healthcheck_end" {
+	} else if cmd == "healthcheck_end" || cmd == "end" {
 		err = healthCheck.End(workflowOk)
 	} else {
 		err = errors.New("invalid subcommand")

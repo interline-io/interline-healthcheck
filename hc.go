@@ -42,6 +42,7 @@ func (hc *Healthcheck) Start() error {
 	if hc.HealthcheckId == "" {
 		return nil
 	}
+	fmt.Println("healthcheck: start")
 	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/start", hc.HealthcheckId)
 	url, err := url.Parse(hcUrl)
 	if err != nil {
@@ -60,9 +61,13 @@ func (hc *Healthcheck) Start() error {
 }
 
 func (hc *Healthcheck) End(success bool) error {
+	if err := hc.SlackNotify(success); err != nil {
+		return err
+	}
 	if hc.HealthcheckId == "" {
 		return nil
 	}
+	fmt.Println("healthcheck: end")
 	exitCode := 0
 	if !success {
 		exitCode = 1
@@ -94,6 +99,7 @@ func (hc *Healthcheck) SlackNotify(success bool) error {
 	if slackUrl == "" {
 		return nil
 	}
+	fmt.Println("healthcheck: slack notify")
 	text := fmt.Sprintf("workflow %s success: %t %s", hc.WorkflowName, success, slackEmoji)
 	resp, err := http.Post(slackUrl, "application/json", toJson(map[string]string{"text": text}))
 	if err != nil {
