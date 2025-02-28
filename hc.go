@@ -1,71 +1,19 @@
-package main
+package hc
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/google/uuid"
 )
 
-func main() {
-	healthcheckId := ""
-	workflowName := ""
-	workflowStatus := ""
-	workflowOk := true
-	workflowSetFail := false
-	workflowSetSuccess := false
-	flag.StringVar(&healthcheckId, "healthcheck-id", os.Getenv("HEALTHCHECKSIO_CHECK_ID"), "Healthcheck ID, defaults to $HEALTHCHECKSIO_CHECK_ID")
-	flag.StringVar(&workflowName, "workflow-name", os.Getenv("WORKFLOW_NAME"), "Workflow name, defaults to $WORKFLOW_NAME")
-	flag.StringVar(&workflowStatus, "workflow-status", os.Getenv("WORKFLOW_STATUS"), "Workflow status, defaults to $WORKFLOW_STATUS")
-	flag.BoolVar(&workflowSetFail, "fail", false, "Set fail state")
-	flag.BoolVar(&workflowSetSuccess, "success", false, "Set success state")
-	flag.Parse()
-	if workflowStatus != "" && strings.ToLower(workflowStatus) != "succeeded" {
-		workflowOk = false
-	}
-	if workflowSetFail {
-		workflowOk = false
-	}
-	if workflowSetSuccess {
-		workflowOk = true
-	}
-	cmd := flag.Arg(0)
-	fmt.Println(
-		"cmd:", cmd,
-		"workflowName:", workflowName,
-		"workflowStatus:", workflowStatus,
-		"workflowOk:", workflowOk,
-		"healthcheckId:", healthcheckId,
-	)
-	if workflowName == "" {
-		fail("set --workflow-name or $WORKFLOW_NAME")
-		return
-	}
-	// Run subcommand
-	var err error
-	if cmd == "slack_notify" {
-		err = slackNotify(workflowName, workflowOk)
-	} else if cmd == "healthcheck_start" {
-		err = healthcheckStart(workflowName, healthcheckId)
-	} else if cmd == "healthcheck_end" {
-		err = healthcheckEnd(workflowName, healthcheckId, workflowOk)
-	} else {
-		err = errors.New("invalid subcommand")
-	}
-	if err != nil {
-		fail(err.Error())
-	}
-}
-
-func slackNotify(workflowName string, success bool) error {
+func SlackNotify(workflowName string, success bool) error {
 	slackUrl := os.Getenv("SLACK_URL_BOTS")
 	slackEmoji := ":globe_with_meridians:"
 	if !success {
@@ -83,7 +31,7 @@ func slackNotify(workflowName string, success bool) error {
 	return checkResponse(resp)
 }
 
-func healthcheckStart(workflowName string, healthcheckId string) error {
+func HealthcheckStart(workflowName string, healthcheckId string) error {
 	if healthcheckId == "" {
 		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
 	}
@@ -104,7 +52,7 @@ func healthcheckStart(workflowName string, healthcheckId string) error {
 	return checkResponse(resp)
 }
 
-func healthcheckEnd(workflowName string, healthcheckId string, success bool) error {
+func HealthcheckEnd(workflowName string, healthcheckId string, success bool) error {
 	if healthcheckId == "" {
 		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
 	}
@@ -146,9 +94,4 @@ func checkResponse(resp *http.Response) error {
 
 func workflowUuid(workflowName string) string {
 	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(workflowName)).String()
-}
-
-func fail(msg string) {
-	fmt.Println(msg)
-	os.Exit(1)
 }
