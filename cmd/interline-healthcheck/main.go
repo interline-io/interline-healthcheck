@@ -17,7 +17,7 @@ func main() {
 	workflowOk := true
 	workflowSetFail := false
 	workflowSetSuccess := false
-	flag.StringVar(&healthcheckId, "healthcheck-id", os.Getenv("HEALTHCHECKSIO_CHECK_ID"), "Healthcheck ID, defaults to $HEALTHCHECKSIO_CHECK_ID")
+	flag.StringVar(&healthcheckId, "healthcheck-id", os.Getenv("HEALTHCHECK_ID"), "Healthcheck ID, defaults to $HEALTHCHECK_ID")
 	flag.StringVar(&workflowName, "workflow-name", os.Getenv("WORKFLOW_NAME"), "Workflow name, defaults to $WORKFLOW_NAME")
 	flag.StringVar(&workflowStatus, "workflow-status", os.Getenv("WORKFLOW_STATUS"), "Workflow status, defaults to $WORKFLOW_STATUS")
 	flag.BoolVar(&workflowSetFail, "fail", false, "Set fail state")
@@ -44,14 +44,19 @@ func main() {
 		fail("set --workflow-name or $WORKFLOW_NAME")
 	}
 
+	healthCheck := hc.NewHealthcheck(
+		healthcheckId,
+		workflowName,
+		os.Getenv("SLACK_URL_SUCCESS"),
+		os.Getenv("SLACK_URL_FAILURE"),
+	)
+
 	// Run subcommand
 	var err error
-	if cmd == "slack_notify" {
-		err = hc.SlackNotify(workflowName, workflowOk)
-	} else if cmd == "healthcheck_start" {
-		err = hc.HealthcheckStart(workflowName, healthcheckId)
+	if cmd == "healthcheck_start" {
+		err = healthCheck.Start()
 	} else if cmd == "healthcheck_end" {
-		err = hc.HealthcheckEnd(workflowName, healthcheckId, workflowOk)
+		err = healthCheck.End(workflowOk)
 	} else {
 		err = errors.New("invalid subcommand")
 	}

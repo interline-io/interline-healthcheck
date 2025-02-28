@@ -13,36 +13,43 @@ import (
 	"github.com/google/uuid"
 )
 
-func SlackNotify(workflowName string, success bool) error {
-	slackUrl := os.Getenv("SLACK_URL_BOTS")
-	slackEmoji := ":globe_with_meridians:"
-	if !success {
-		slackUrl = os.Getenv("SLACK_URL_GENERAL")
-		slackEmoji = ":X:"
-	}
-	if slackUrl == "" {
-		return errors.New("set $SLACK_URL_BOTS and $SLACK_URL_GENERAL")
-	}
-	text := fmt.Sprintf("workflow %s success: %t %s", workflowName, success, slackEmoji)
-	resp, err := http.Post(slackUrl, "application/json", toJson(map[string]string{"text": text}))
-	if err != nil {
-		return err
-	}
-	return checkResponse(resp)
+type Healthcheck struct {
+	HealthcheckId   string
+	WorkflowName    string
+	SlackUrlSuccess string
+	SlackUrlFailure string
 }
 
-func HealthcheckStart(workflowName string, healthcheckId string) error {
-	if healthcheckId == "" {
-		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
+func NewHealthcheck(healthcheckId, workflowName, slackUrlSuccess, slackUrlFailure string) *Healthcheck {
+	return &Healthcheck{
+		HealthcheckId:   healthcheckId,
+		WorkflowName:    workflowName,
+		SlackUrlSuccess: slackUrlSuccess,
+		SlackUrlFailure: slackUrlFailure,
 	}
-	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/start", healthcheckId)
+}
+
+func NewHealthcheckFromEnv() *Healthcheck {
+	return &Healthcheck{
+		HealthcheckId:   os.Getenv("HEALTHCHECK_ID"),
+		WorkflowName:    os.Getenv("WORKFLOW_NAME"),
+		SlackUrlSuccess: os.Getenv("SLACK_URL_SUCCESS"),
+		SlackUrlFailure: os.Getenv("SLACK_URL_FAILURE"),
+	}
+}
+
+func (hc *Healthcheck) Start() error {
+	if hc.HealthcheckId == "" {
+		return nil
+	}
+	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/start", hc.HealthcheckId)
 	url, err := url.Parse(hcUrl)
 	if err != nil {
 		return err
 	}
-	if workflowName != "" {
+	if hc.WorkflowName != "" {
 		q := url.Query()
-		q.Add("rid", workflowUuid(workflowName))
+		q.Add("rid", workflowUuid(hc.WorkflowName))
 		url.RawQuery = q.Encode()
 	}
 	resp, err := http.Get(url.String())
@@ -52,25 +59,43 @@ func HealthcheckStart(workflowName string, healthcheckId string) error {
 	return checkResponse(resp)
 }
 
-func HealthcheckEnd(workflowName string, healthcheckId string, success bool) error {
-	if healthcheckId == "" {
-		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
+func (hc *Healthcheck) End(success bool) error {
+	if hc.HealthcheckId == "" {
+		return nil
 	}
 	exitCode := 0
 	if !success {
 		exitCode = 1
 	}
-	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/%d", healthcheckId, exitCode)
+	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/%d", hc.HealthcheckId, exitCode)
 	url, err := url.Parse(hcUrl)
 	if err != nil {
 		return err
 	}
-	if workflowName != "" {
+	if hc.WorkflowName != "" {
 		q := url.Query()
-		q.Add("rid", workflowUuid(workflowName))
+		q.Add("rid", workflowUuid(hc.WorkflowName))
 		url.RawQuery = q.Encode()
 	}
 	resp, err := http.Get(url.String())
+	if err != nil {
+		return err
+	}
+	return checkResponse(resp)
+}
+
+func (hc *Healthcheck) SlackNotify(success bool) error {
+	slackUrl := hc.SlackUrlSuccess
+	slackEmoji := ":globe_with_meridians:"
+	if !success {
+		slackUrl = hc.SlackUrlFailure
+		slackEmoji = ":X:"
+	}
+	if slackUrl == "" {
+		return nil
+	}
+	text := fmt.Sprintf("workflow %s success: %t %s", hc.WorkflowName, success, slackEmoji)
+	resp, err := http.Post(slackUrl, "application/json", toJson(map[string]string{"text": text}))
 	if err != nil {
 		return err
 	}
