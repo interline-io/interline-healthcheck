@@ -1,19 +1,23 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/interline-io/interline-healthcheck/hc"
 )
+
+func getEnvKeys(v ...string) string {
+	for _, key := range v {
+		if os.Getenv(key) != "" {
+			return key
+		}
+	}
+	return ""
+}
 
 func main() {
 	healthcheckId := ""
@@ -22,12 +26,31 @@ func main() {
 	workflowOk := true
 	workflowSetFail := false
 	workflowSetSuccess := false
-	flag.StringVar(&healthcheckId, "healthcheck-id", os.Getenv("HEALTHCHECKSIO_CHECK_ID"), "Healthcheck ID, defaults to $HEALTHCHECKSIO_CHECK_ID")
-	flag.StringVar(&workflowName, "workflow-name", os.Getenv("WORKFLOW_NAME"), "Workflow name, defaults to $WORKFLOW_NAME")
-	flag.StringVar(&workflowStatus, "workflow-status", os.Getenv("WORKFLOW_STATUS"), "Workflow status, defaults to $WORKFLOW_STATUS")
+	flag.StringVar(&healthcheckId, "healthcheck-id", "", "Healthcheck ID, defaults to $HEALTHCHECK_ID or $HEALTHCHECKSIO_CHECK_ID")
+	flag.StringVar(&workflowName, "workflow-name", "", "Workflow name, defaults to $WORKFLOW_NAME")
+	flag.StringVar(&workflowStatus, "workflow-status", "", "Workflow status, defaults to $WORKFLOW_STATUS")
 	flag.BoolVar(&workflowSetFail, "fail", false, "Set fail state")
 	flag.BoolVar(&workflowSetSuccess, "success", false, "Set success state")
 	flag.Parse()
+
+	// Configure healthcheckId
+	if healthcheckId == "" {
+		healthcheckId = getEnvKeys("HEALTHCHECK_ID", "HEALTHCHECKSIO_CHECK_ID")
+	}
+
+	// Configure slack
+	slackUrlSuccess := getEnvKeys("SLACK_URL_SUCCESS", "SLACK_URL_BOTS")
+	slackUrlFailure := getEnvKeys("SLACK_URL_FAILURE", "SLACK_URL_GENERAL")
+
+	// Configure workflowName and workflowStatus
+	if workflowName == "" {
+		workflowStatus = getEnvKeys("WORKFLOW_NAME")
+	}
+	if workflowStatus == "" {
+		workflowStatus = getEnvKeys("WORKFLOW_STATUS")
+	}
+
+	// Configure workflowOk
 	if workflowStatus != "" && strings.ToLower(workflowStatus) != "succeeded" {
 		workflowOk = false
 	}
@@ -37,6 +60,8 @@ func main() {
 	if workflowSetSuccess {
 		workflowOk = true
 	}
+
+	// Debug
 	cmd := flag.Arg(0)
 	fmt.Println(
 		"cmd:", cmd,
@@ -47,105 +72,28 @@ func main() {
 	)
 	if workflowName == "" {
 		fail("set --workflow-name or $WORKFLOW_NAME")
-		return
 	}
+
+	// Configure to run
+	healthCheck := hc.NewHealthcheck(
+		healthcheckId,
+		workflowName,
+		slackUrlSuccess,
+		slackUrlFailure,
+	)
+
 	// Run subcommand
 	var err error
-	if cmd == "slack_notify" {
-		err = slackNotify(workflowName, workflowOk)
-	} else if cmd == "healthcheck_start" {
-		err = healthcheckStart(workflowName, healthcheckId)
-	} else if cmd == "healthcheck_end" {
-		err = healthcheckEnd(workflowName, healthcheckId, workflowOk)
+	if cmd == "healthcheck_start" || cmd == "start" {
+		err = healthCheck.Start()
+	} else if cmd == "healthcheck_end" || cmd == "end" || cmd == "slack_notify" {
+		err = healthCheck.End(workflowOk)
 	} else {
 		err = errors.New("invalid subcommand")
 	}
 	if err != nil {
 		fail(err.Error())
 	}
-}
-
-func slackNotify(workflowName string, success bool) error {
-	slackUrl := os.Getenv("SLACK_URL_BOTS")
-	slackEmoji := ":globe_with_meridians:"
-	if !success {
-		slackUrl = os.Getenv("SLACK_URL_GENERAL")
-		slackEmoji = ":X:"
-	}
-	if slackUrl == "" {
-		return errors.New("set $SLACK_URL_BOTS and $SLACK_URL_GENERAL")
-	}
-	text := fmt.Sprintf("workflow %s success: %t %s", workflowName, success, slackEmoji)
-	resp, err := http.Post(slackUrl, "application/json", toJson(map[string]string{"text": text}))
-	if err != nil {
-		return err
-	}
-	return checkResponse(resp)
-}
-
-func healthcheckStart(workflowName string, healthcheckId string) error {
-	if healthcheckId == "" {
-		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
-	}
-	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/start", healthcheckId)
-	url, err := url.Parse(hcUrl)
-	if err != nil {
-		return err
-	}
-	if workflowName != "" {
-		q := url.Query()
-		q.Add("rid", workflowUuid(workflowName))
-		url.RawQuery = q.Encode()
-	}
-	resp, err := http.Get(url.String())
-	if err != nil {
-		return err
-	}
-	return checkResponse(resp)
-}
-
-func healthcheckEnd(workflowName string, healthcheckId string, success bool) error {
-	if healthcheckId == "" {
-		return errors.New("set --healthcheck-id or $HEALTHCHECKSIO_CHECK_ID")
-	}
-	exitCode := 0
-	if !success {
-		exitCode = 1
-	}
-	hcUrl := fmt.Sprintf("https://hc-ping.com/%s/%d", healthcheckId, exitCode)
-	url, err := url.Parse(hcUrl)
-	if err != nil {
-		return err
-	}
-	if workflowName != "" {
-		q := url.Query()
-		q.Add("rid", workflowUuid(workflowName))
-		url.RawQuery = q.Encode()
-	}
-	resp, err := http.Get(url.String())
-	if err != nil {
-		return err
-	}
-	return checkResponse(resp)
-}
-
-func toJson(v any) io.Reader {
-	jj, _ := json.Marshal(v)
-	return bytes.NewReader(jj)
-}
-
-func checkResponse(resp *http.Response) error {
-	respData, _ := io.ReadAll(resp.Body)
-	respString := string(respData)
-	if resp.StatusCode > 299 {
-		return errors.New("request failed: " + respString)
-	}
-	fmt.Println("response ok:", respString)
-	return nil
-}
-
-func workflowUuid(workflowName string) string {
-	return uuid.NewSHA1(uuid.NameSpaceDNS, []byte(workflowName)).String()
 }
 
 func fail(msg string) {
