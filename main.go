@@ -23,34 +23,36 @@ func main() {
 	healthcheckId := ""
 	workflowName := ""
 	workflowStatus := ""
-	workflowOk := true
 	workflowSetFail := false
 	workflowSetSuccess := false
-	flag.StringVar(&healthcheckId, "healthcheck-id", "", "Healthcheck ID, defaults to $HEALTHCHECK_ID or $HEALTHCHECKSIO_CHECK_ID")
-	flag.StringVar(&workflowName, "workflow-name", "", "Workflow name, defaults to $WORKFLOW_NAME")
-	flag.StringVar(&workflowStatus, "workflow-status", "", "Workflow status, defaults to $WORKFLOW_STATUS")
 	flag.BoolVar(&workflowSetFail, "fail", false, "Set fail state")
 	flag.BoolVar(&workflowSetSuccess, "success", false, "Set success state")
+	flag.StringVar(
+		&healthcheckId,
+		"healthcheck-id",
+		getEnvKeys("HEALTHCHECK_ID", "HEALTHCHECKSIO_CHECK_ID"),
+		"Healthcheck ID, defaults to $HEALTHCHECK_ID or $HEALTHCHECKSIO_CHECK_ID",
+	)
+	flag.StringVar(
+		&workflowName,
+		"workflow-name",
+		getEnvKeys("WORKFLOW_NAME", "HOSTNAME"),
+		"Workflow name, defaults to $WORKFLOW_NAME or $HOSTNAME",
+	)
+	flag.StringVar(
+		&workflowStatus,
+		"workflow-status",
+		getEnvKeys("WORKFLOW_STATUS"),
+		"Workflow status, defaults to $WORKFLOW_STATUS",
+	)
 	flag.Parse()
-
-	// Configure healthcheckId
-	if healthcheckId == "" {
-		healthcheckId = getEnvKeys("HEALTHCHECK_ID", "HEALTHCHECKSIO_CHECK_ID")
-	}
 
 	// Configure slack
 	slackUrlSuccess := getEnvKeys("SLACK_URL_SUCCESS", "SLACK_URL_BOTS")
 	slackUrlFailure := getEnvKeys("SLACK_URL_FAILURE", "SLACK_URL_GENERAL")
 
-	// Configure workflowName and workflowStatus
-	if workflowName == "" {
-		workflowStatus = getEnvKeys("WORKFLOW_NAME")
-	}
-	if workflowStatus == "" {
-		workflowStatus = getEnvKeys("WORKFLOW_STATUS")
-	}
-
 	// Configure workflowOk
+	workflowOk := true
 	if workflowStatus != "" && strings.ToLower(workflowStatus) != "succeeded" {
 		workflowOk = false
 	}
