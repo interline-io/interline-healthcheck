@@ -10,10 +10,10 @@ import (
 	"github.com/interline-io/interline-healthcheck/hc"
 )
 
-func getEnvKeys(v ...string) string {
-	for _, key := range v {
-		if os.Getenv(key) != "" {
-			return key
+func getEnvKeys(keys ...string) string {
+	for _, key := range keys {
+		if v := os.Getenv(key); v != "" {
+			return v
 		}
 	}
 	return ""
