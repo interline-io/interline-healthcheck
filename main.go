@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	hc "github.com/interline-io/interline-healthcheck"
+	"github.com/interline-io/interline-healthcheck/hc"
 )
 
 func main() {
